@@ -11,7 +11,7 @@ def logistic_cost(a, y):
 
 def logistic_derivitave(a, y):
     grads = (-y/a) + ((1-y)/(1-a))
-    return grads
+    return np.nan_to_num(grads)
 
 
 class NetworkLayer(ABC):
@@ -42,9 +42,9 @@ class NetworkLayer(ABC):
 
         self.i = inputs
         self.z = (self.w @ inputs) + self.b
-        self.a = self.activation(self.z)
+        a = self.activation(self.z)
 
-        return self.a
+        return a
 
 
     def back_propagation(self, da: np.matrix, alpha=0.01) -> np.matrix:
@@ -54,10 +54,12 @@ class NetworkLayer(ABC):
         dW = (1. / m) * (dZ @ self.i.T)
         dB = (1. / m) * np.sum(np.array(dZ), axis=1, keepdims=True)
 
+        da_out = self.w.T @ dZ
+
         self.w -= alpha * dW
         self.b -= alpha * dB
         # da_out = None
-        return dZ
+        return da_out
 
 class TanhLayer(NetworkLayer):
 
@@ -67,6 +69,23 @@ class TanhLayer(NetworkLayer):
     def activation_derivative(self, z: np.matrix) -> np.matrix:
         return (1 - np.power(z, 2))
 
+
+class SigmoidLayer(NetworkLayer):
+
+    def activation(self, z: np.matrix) -> np.matrix:
+        return 1 / (1 + np.exp(-z))
+
+    def activation_derivative(self, z: np.matrix) -> np.matrix:
+        a = self.activation(z)
+        return np.multiply(a, (1 - a))
+
+class SinLayer(NetworkLayer):
+
+    def activation(self, z: np.matrix) -> np.matrix:
+        return np.sin(z)
+
+    def activation_derivative(self, z: np.matrix) -> np.matrix:
+        return np.cos(z)
 
 
 class NeuralNetwork(object):
@@ -85,22 +104,34 @@ class NeuralNetwork(object):
             da = layer.back_propagation(da, alpha)
         return da
 
+    def train(self, x, y, iter=1000, alpha=0.1):
+
+        for i in range(iter):
+            a = self.forward_propagation(x)
+
+            cost = logistic_cost(a, y)
+            print(i, cost)
+            da = logistic_derivitave(a, y)
+
+            self.back_propagation(da, min(1, cost * alpha))
+
+        return np.sum(np.abs(np.round(self.forward_propagation(x)) - y)) / y.shape[1]
+
+
 if __name__ == '__main__':
-    nn = NeuralNetwork(TanhLayer(1))
+    nn = NeuralNetwork(
+                        SinLayer(30),
+                        TanhLayer(20),
+                        SigmoidLayer(1)
+                       )
+
     x = np.matrix([[0.1, 0.2, 0.3],
                    [0.2, 0.4, 0.5]])
+
     y = np.matrix([0, 0, 1])
 
-    for i in range(20):
-        a = nn.forward_propagation(x)
+    print(nn.train(x, y, 10000, 1))
 
-        cost = logistic_cost(a, y)
-        print(i, cost)
-        da = logistic_derivitave(a, y)
-
-        nn.back_propagation(da, 0.01)
-
-    i=1
 
 
 
